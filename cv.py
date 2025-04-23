@@ -8,6 +8,7 @@ class DetectSpeed:
         self.prev_kp = None
         self.prev_des = None
         pass
+
     def compute_speed(self, frames, dt=1):
         """
         I assume the color has been converted to COLOR_BGR2GRAY(grayscale)
@@ -15,13 +16,17 @@ class DetectSpeed:
         if dt < 0:
             raise ValueError("dt must be at greater than 0")
         if not frames or len(frames) == 0:
-            raise ValueError("need to capture a number of frames at a particular dt to use.")
+            raise ValueError(
+                "need to capture a number of frames at a particular dt to use."
+            )
 
         x, y = [], []
         for frame in frames:
             # ohh  I can just simply check
             if frame.size(0) != 1:
-                raise ValueError("use gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) to convert image frame to grayscale")
+                raise ValueError(
+                    "use gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) to convert image frame to grayscale"
+                )
 
             # ORB on current frame
             kp, des = self.orb.detectAndCompute(frame, None)
@@ -46,6 +51,6 @@ class DetectSpeed:
             self.prev_des = des
             self.prev_kp = kp
 
-        x_vel = np.mean(x)/dt if x else 0
-        y_vel = np.mean(y)/dt if y else 0
+        x_vel = np.mean(x) / dt if x else 0
+        y_vel = np.mean(y) / dt if y else 0
         return x_vel, y_vel

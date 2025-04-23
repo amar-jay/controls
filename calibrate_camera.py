@@ -15,7 +15,7 @@ obj_points_all = []
 img_points_all = []
 
 # Load calibration images
-images = glob.glob('calibration_images/*.jpg')
+images = glob.glob("calibration_images/*.jpg")
 
 # Process each image
 for image_file in images:
@@ -31,12 +31,13 @@ for image_file in images:
 
         # Draw and display the corners
         cv2.drawChessboardCorners(image, checkerboard_dims, corners, ret)
-        cv2.imshow('Checkerboard', image)
+        cv2.imshow("Checkerboard", image)
         cv2.waitKey(500)
 
 # Calibrate the camera
 ret, camera_matrix, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(
-    obj_points_all, img_points_all, gray.shape[::-1], None, None)
+    obj_points_all, img_points_all, gray.shape[::-1], None, None
+)
 
 # Print the camera matrix
 print("Camera Matrix:")
@@ -45,6 +46,7 @@ np.save("camera_matrix.npy", camera_matrix)
 
 
 # Extract the focal length from the camera matrix
-focal_length = camera_matrix[0, 0]  # Focal length (fx), since the matrix is typically (fx, 0, cx)
+focal_length = camera_matrix[
+    0, 0
+]  # Focal length (fx), since the matrix is typically (fx, 0, cx)
 print(f"Focal Length (fx): {focal_length}")
-
