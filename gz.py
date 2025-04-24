@@ -37,7 +37,7 @@ def enable_streaming(world="our_runway", model_name="iris_with_gimbal", camera_l
         return False
 
 
-def point_gimbal_downward():
+def point_gimbal_downward(topic="/gimbal/cmd_tilt", angle=0) -> bool:
     """
     Uses gz command line to point gimbal downward.
     """
@@ -45,21 +45,22 @@ def point_gimbal_downward():
         "gz",
         "topic",
         "-t",
-        "/gimbal/cmd_tilt",
+        f"{topic}",
         "-m",
         "gz.msgs.Double",
         "-p",
-        "data: 0"#-1.570796",
+        f"data: {angle}",
     ]
 	 
     try:
-        result = subprocess.run(
+        subprocess.run(
             command,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
+        print("[CAMERA] Gimbal pointed to angle:", angle, "degrees. On topic:", topic)
         return True
     except subprocess.CalledProcessError as e:
         print("Error:", e.stderr)
@@ -152,8 +153,8 @@ class GazeboVideoCapture:
     def get_frame_size(self):
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        return width, height, fps
+        #fps = self.cap.get(cv2.CAP_PROP_FPS)
+        return width, height, None
 
 def get_current_gps_location(master, timeout=5.0):
     msg = master.recv_match(type="GLOBAL_POSITION_INT", blocking=True, timeout=timeout)
@@ -378,7 +379,7 @@ def check_waypoint_reached():
     )
     alt_diff = abs(current_alt - target_alt) / 1000.0
 
-    # print(f"Distance: {dist:.1f} m, Alt diff: {alt_diff:.2f} m")
+    print(f"Distance: {dist:.1f} m, Alt diff: {alt_diff:.2f} m")
 
     if (
         dist <= _waypoint_state["radius_m"]

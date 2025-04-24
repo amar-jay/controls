@@ -5,7 +5,7 @@ import math
 import time
 import yolo
 import gz
-from gz import GazeboVideoCapture
+# from gz import GazeboVideoCapture
 import logging
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
@@ -22,11 +22,12 @@ print(
 
 
 gz.arm_and_takeoff(master, target_altitude=10.0)
+time.sleep(5)
 
-done = gz.point_gimbal_downward()
-if not done:
-    print("❌ Failed to point gimbal downward.")
-    exit(1)
+# done = gz.point_gimbal_downward()
+# if not done:
+#     print("❌ Failed to point gimbal downward.")
+#     exit(1)
 
 done = gz.enable_streaming(
     world="delivery_runway",
@@ -60,11 +61,11 @@ waypoints = [
 
 
 print("📸 Starting video stream...")
-camera = GazeboVideoCapture()
-width, height, fps = camera.get_frame_size()
+camera = gz.GazeboVideoCapture()
+width, height, _ = camera.get_frame_size()
 cap = camera.get_capture()
 
-print(f"[CAMERA]  → width: {width}, height: {height}, fps: {fps}")
+print(f"[CAMERA]  → width: {width}, height: {height}")
 
 estimator = yolo.YoloObjectTracker(
     "best.pt", 
@@ -93,6 +94,11 @@ for idx, (lat, lon, alt) in enumerate(waypoints):
 
         results = estimator.detect(frame)
         coords, center_pose, annotated_frame = estimator.process_frame(results, current_lat, current_lon, alt, object_class="helipad")
+        print(f"[YOLO]  →   detected {len(results)} objects.")
+        if coords is not None:
+            print(f"[YOLO]  →   detected helipad at {coords} with center {center_pose}")
+        else:
+            print(f"[YOLO]  →   no helipad detected.")
 
         text_latlon_base = f"current Lat: {current_lat:.6f}, Lon: {current_lon:.6f}"
         if coords is None or center_pose is None:
@@ -119,8 +125,7 @@ for idx, (lat, lon, alt) in enumerate(waypoints):
 
         # wait for a bit before capturing the next frame
         cv2.imshow("Annotated Stream", annotated_frame)
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
+
 
         reached = gz.check_waypoint_reached()
         if reached:
@@ -133,6 +138,9 @@ for idx, (lat, lon, alt) in enumerate(waypoints):
                 f"  ❌ failed to reach waypoint {idx} in time going to next waypoint, skipping slice."
             )
             break
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
 
 
         time.sleep(PER_CAPTURE)

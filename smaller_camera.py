@@ -11,10 +11,12 @@ pipeline = (
     "appsink drop=1"
 )
 
-done = gz.point_gimbal_downward()
-if not done:
-    print("❌ Failed to point gimbal downward.")
-    exit(1)
+# done = gz.point_gimbal_downward(
+#     topic="/gimbal/cmd_tilt",
+#     angle=1.57)
+# if not done:
+#     print("❌ Failed to point gimbal downward.")
+#     exit(1)
 
 done = gz.enable_streaming(
     world="delivery_runway",
