@@ -1,4 +1,5 @@
 import cv2
+import gz
 
 pipeline = (
     "udpsrc port=5600 ! "
@@ -10,9 +11,22 @@ pipeline = (
     "appsink drop=1"
 )
 
-cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+done = gz.point_gimbal_downward()
+if not done:
+    print("❌ Failed to point gimbal downward.")
+    exit(1)
 
-print(cv2.getBuildInformation())
+done = gz.enable_streaming(
+    world="delivery_runway",
+    model_name="iris_with_stationary_gimbal",
+    camera_link="tilt_link")
+if not done:
+    print("❌ Failed to enable streaming.")
+    exit(1)
+
+
+
+cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
 
 
 if not cap.isOpened():

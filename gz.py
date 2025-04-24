@@ -5,7 +5,7 @@ import math
 import time
 import pymavlink.dialects.v20.all as dialect
 
-def enable_streaming(world="our_runway", model_name="iris_with_gimbal", camera_name="camera") -> bool:
+def enable_streaming(world="our_runway", model_name="iris_with_gimbal", camera_link="pitch_link") -> bool:
     """
     Enable streaming for the camera in the Gazebo simulation.
     """
@@ -14,7 +14,7 @@ def enable_streaming(world="our_runway", model_name="iris_with_gimbal", camera_n
         "gz",
         "topic",
         "-t",
-        f"/world/{world}/model/{model_name}/model/gimbal/link/pitch_link/sensor/{camera_name}/image/enable_streaming",
+        f"/world/{world}/model/{model_name}/model/gimbal/link/{camera_link}/sensor/camera/image/enable_streaming",
         # "/world/our_runway/model/iris_with_gimbal/model/gimbal/link/pitch_link/sensor/camera/image/enable_streaming",
         "-m",
         "gz.msgs.Boolean",
@@ -45,11 +45,11 @@ def point_gimbal_downward():
         "gz",
         "topic",
         "-t",
-        "/gimbal/cmd_pitch",
+        "/gimbal/cmd_tilt",
         "-m",
         "gz.msgs.Double",
         "-p",
-        "data: -1.5708",
+        "data: 0"#-1.570796",
     ]
 	 
     try:
@@ -60,7 +60,6 @@ def point_gimbal_downward():
             stderr=subprocess.PIPE,
             text=True,
         )
-        print("Output:", result.stdout)
         return True
     except subprocess.CalledProcessError as e:
         print("Error:", e.stderr)
@@ -125,26 +124,6 @@ def arm_and_takeoff(connection, target_altitude=5.0):
     time.sleep(10)  # crude wait; replace with altitude monitor if needed
 
     print("Takeoff command sent.")
-
-def videocapture():
-    """
-    Open a video stream from the Gazebo simulation.
-    """
-    pipeline = (
-        "udpsrc port=5600 ! "
-        "application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96 ! "
-        "rtph264depay ! "
-        "h264parse ! "
-        "avdec_h264 ! "
-        "videoconvert ! "
-        "appsink drop=1"
-    )
-
-    cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
-
-    if not cap.isOpened():
-        raise RuntimeError("Failed to open stream! Check sender or pipeline.")
-    return cap
 
 class GazeboVideoCapture:
     def __init__(self):
@@ -292,7 +271,7 @@ def goto_waypoint(
     Initiate waypoint navigation. This does not block.
     """
     print(
-        f"goto_waypoint: lat={lat}, lon={lon}, alt={alt}, radius_m={radius_m}, alt_thresh={alt_thresh}, timeout={timeout}"
+        f"[MAVLink] goto_waypoint: lat={lat}, lon={lon}, alt={alt}, radius_m={radius_m}, alt_thresh={alt_thresh}, timeout={timeout}"
     )
 
     # Check if a waypoint is already in progress
@@ -338,7 +317,7 @@ def goto_waypoint(
         param4=0,
         x = int(lat * 1e7),
         y = int(lon * 1e7),
-        z = 0,
+        z = int(alt), # DOESN'T TAKE alt/1000
         # z = int(alt)   # in mm
     )
 
@@ -399,14 +378,15 @@ def check_waypoint_reached():
     )
     alt_diff = abs(current_alt - target_alt) / 1000.0
 
-    print(f"Distance: {dist:.1f} m, Alt diff: {alt_diff:.2f} m")
+    # print(f"Distance: {dist:.1f} m, Alt diff: {alt_diff:.2f} m")
 
     if (
         dist <= _waypoint_state["radius_m"]
         and alt_diff <= _waypoint_state["alt_thresh"]
     ):
         print("✅ Reached waypoint.")
-        _waypoint_state.clear()
+        if check_pickup_confirmation():
+            _waypoint_state.clear()
         return True
 
     if time.time() - _waypoint_state["start_time"] > _waypoint_state["timeout"]:
@@ -415,3 +395,35 @@ def check_waypoint_reached():
         return None
 
     return False  # Still on the way
+
+
+WAIT_FOR_PICKUP_CONFIRMATION_TIMEOUT = 10  # seconds
+pickup_confirmation_counter = 0
+def check_pickup_confirmation():
+    """
+    Check if the pickup confirmation has been received.
+    """
+    global pickup_confirmation_counter
+    pickup_confirmation_counter += 1
+
+    if pickup_confirmation_counter >= WAIT_FOR_PICKUP_CONFIRMATION_TIMEOUT:
+        print("❌ Timeout: did not receive pickup confirmation in time.")
+        return False
+
+    # Placeholder: always returns True for this example
+    return True
+
+def is_pickup_confirmation_received():
+    """
+    Check if the pickup confirmation has been received.
+    """
+    # This is a placeholder. In a real implementation, you would check
+    # for a specific MAVLink message or condition that indicates
+    # the pickup confirmation. For this placeholder we will wait for 10 captures
+    # and then return True.
+
+    if (pickup_confirmation_counter >= WAIT_FOR_PICKUP_CONFIRMATION_TIMEOUT):
+        pickup_confirmation_counter = 0
+        return True
+    else:
+        return False
