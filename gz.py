@@ -67,13 +67,12 @@ def point_gimbal_downward(topic="/gimbal/cmd_tilt", angle=0) -> bool:
         return False
 
 
-def arm_and_takeoff(connection, target_altitude=5.0):
+def arm(connection):
     """
-    Arms vehicle and initiates takeoff to target_altitude in meters.
+    Arms the vehicle and sets it to GUIDED mode.
 
     Parameters:
-        connection: mavutil.mavlink_connection object
-        target_altitude: Desired takeoff altitude in meters
+        connection: The MAVLink connection object.
     """
     # Wait for a heartbeat from the vehicle
     print("Waiting for heartbeat...")
@@ -105,6 +104,11 @@ def arm_and_takeoff(connection, target_altitude=5.0):
     connection.motors_armed_wait()
     print("Motors armed!")
 
+def takeoff(connection, target_altitude=5.0):
+    """
+    Initiates takeoff to target altitude in meters.
+    """
+
     # Send takeoff command
     print(f"Taking off to {target_altitude} meters...")
     connection.mav.command_long_send(
@@ -122,7 +126,7 @@ def arm_and_takeoff(connection, target_altitude=5.0):
     )
 
     # Optional: wait for some time or monitor altitude via message stream
-    time.sleep(10)  # crude wait; replace with altitude monitor if needed
+    time.sleep(20)  # crude wait; replace with altitude monitor if needed
 
     print("Takeoff command sent.")
 
@@ -260,13 +264,24 @@ def goto_waypoint_sync(
     print("❌ Timeout: did not reach waypoint in time.")
     return False
 
+def clear_mav_missions(connection):
+    print("[MAVLink] Clearing all missions. Hack...")
+    # Clear all missions to prevent interference
+    connection.mav.mission_clear_all_send(connection.target_system, connection.target_component)
+    time.sleep(0.5)  # Give the FCU some breathing room
+
+    # Set to GUIDED mode explicitly (you can also use MAV_MODE_AUTO if that suits your logic)
+    connection.set_mode("GUIDED")  # Or use command_long if you don't have helper
+
+
 
 # Global state
 _waypoint_state = {}
-
+WAIT_FOR_PICKUP_CONFIRMATION_TIMEOUT = 10  # seconds
+pickup_confirmation_counter = 0
 
 def goto_waypoint(
-    master, lat: float, lon: float, alt: float, radius_m=2.0, alt_thresh=1.0, timeout=20
+    master, lat: float, lon: float, alt: float, radius_m=.5, alt_thresh=1.0, timeout=20, alt_compensation=0.0
 ):
     """
     Initiate waypoint navigation. This does not block.
@@ -304,6 +319,7 @@ def goto_waypoint(
     # )
 
 
+
     message = dialect.MAVLink_mission_item_int_message(
         target_system=master.target_system,
         target_component=master.target_component,
@@ -318,7 +334,7 @@ def goto_waypoint(
         param4=0,
         x = int(lat * 1e7),
         y = int(lon * 1e7),
-        z = int(alt), # DOESN'T TAKE alt/1000
+        z = int(alt), # DOESN'T TAKE alt/1000 nor compensated altitude 
         # z = int(alt)   # in mm
     )
 
@@ -328,12 +344,13 @@ def goto_waypoint(
     # Store state
     _waypoint_state["target_lat"] = int(lat * 1e7)
     _waypoint_state["target_lon"] = int(lon * 1e7)
-    _waypoint_state["target_alt"] = int(alt * 1000)
+    _waypoint_state["target_alt"] = int(alt)
     _waypoint_state["radius_m"] = radius_m
     _waypoint_state["alt_thresh"] = alt_thresh
     _waypoint_state["start_time"] = time.time()
     _waypoint_state["timeout"] = timeout
     _waypoint_state["master"] = master
+    _waypoint_state["alt_compensation"] = alt_compensation
 
 
 def check_waypoint_reached():
@@ -348,14 +365,25 @@ def check_waypoint_reached():
         return None  # No waypoint in progress
 
     master = _waypoint_state["master"]
+    print("[DEBUG] Heartbeat timestamp:", master.wait_heartbeat)
+    print("[DEBUG] System ID:", master.target_system)
+    print("[DEBUG] Component ID:", master.target_component)
     msg = master.recv_match(type="GLOBAL_POSITION_INT", blocking=False)
 
     if not msg:
+        msg = master.recv_match(blocking=False)
+        if msg:
+            print("[MAVLink 🔁]", msg.get_type(), msg.to_dict())
+        else:
+            print("[MAVLink 🚫] Nothing coming in")
+
+        print("[DEBUG]⚠️ No GLOBAL_POSITION_INT received.")
         return False  # No new data yet
 
     current_lat = msg.lat
     current_lon = msg.lon
-    current_alt = msg.alt  # in mm
+    current_alt = msg.alt/1000 - _waypoint_state["alt_compensation"]  # in m
+    print(f"{current_alt=} {msg.alt=} {_waypoint_state['alt_compensation']=}")
 
     target_lat = _waypoint_state["target_lat"]
     target_lon = _waypoint_state["target_lon"]
@@ -378,17 +406,22 @@ def check_waypoint_reached():
         current_lat / 1e7, current_lon / 1e7, target_lat / 1e7, target_lon / 1e7
     )
     alt_diff = abs(current_alt - target_alt) / 1000.0
-
+    print(f"Current location: lat={current_lat}, lon={current_lon}, alt={current_alt}")
+    print(f"Target location: lat={target_lat}, lon={target_lon}, alt={target_alt}")
     print(f"Distance: {dist:.1f} m, Alt diff: {alt_diff:.2f} m")
+    print("Current Alt:", current_alt, "Target Alt:", target_alt)
+    print()
 
     if (
         dist <= _waypoint_state["radius_m"]
         and alt_diff <= _waypoint_state["alt_thresh"]
     ):
         print("✅ Reached waypoint.")
-        if check_pickup_confirmation():
-            _waypoint_state.clear()
+        # if check_pickup_confirmation():
+        _waypoint_state.clear()
+        # clear_mav_missions(master) # This is a hack to allow multiple waypoints to while bypassing the mission manager
         return True
+
 
     if time.time() - _waypoint_state["start_time"] > _waypoint_state["timeout"]:
         print("❌ Timeout: did not reach waypoint in time.")
@@ -398,8 +431,7 @@ def check_waypoint_reached():
     return False  # Still on the way
 
 
-WAIT_FOR_PICKUP_CONFIRMATION_TIMEOUT = 10  # seconds
-pickup_confirmation_counter = 0
+
 def check_pickup_confirmation():
     """
     Check if the pickup confirmation has been received.
@@ -418,6 +450,7 @@ def is_pickup_confirmation_received():
     """
     Check if the pickup confirmation has been received.
     """
+    global pickup_confirmation_counter
     # This is a placeholder. In a real implementation, you would check
     # for a specific MAVLink message or condition that indicates
     # the pickup confirmation. For this placeholder we will wait for 10 captures
@@ -428,3 +461,20 @@ def is_pickup_confirmation_received():
         return True
     else:
         return False
+
+
+alt_compensation = 0.0  # Global variable to store altitude compensation
+def get_base_alt()->int:
+    """
+    Get the base altitude compensation value.
+    """
+    global alt_compensation
+    return alt_compensation
+
+def update_alt_compensation(alt: int) -> int:
+    """
+    Update the altitude compensation value.
+    """
+    global alt_compensation
+    alt_compensation += alt
+    return alt

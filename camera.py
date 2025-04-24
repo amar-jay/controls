@@ -12,7 +12,7 @@ logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
 CONNECTION_STR = "udp:127.0.0.1:14550"
 SAVE_DIR = "captures"  # directory to save images
-PER_CAPTURE = 1  # time in seconds to wait between captures
+PER_CAPTURE = .3  # time in seconds to wait between captures
 
 master = mavutil.mavlink_connection(CONNECTION_STR)
 master.wait_heartbeat()
@@ -20,14 +20,22 @@ print(
     f"[MAVLink] Heartbeat from system {master.target_system}, component {master.target_component}"
 )
 
+takeoff_altitude = 10.0
 
-gz.arm_and_takeoff(master, target_altitude=10.0)
-time.sleep(5)
+gz.arm(master)
 
-# done = gz.point_gimbal_downward()
-# if not done:
-#     print("❌ Failed to point gimbal downward.")
-#     exit(1)
+location = gz.get_current_gps_location(master)
+if location is None:
+    print("❌ Failed to get current GPS location.")
+    exit(1)
+
+lat, lon, alt = location
+gz.update_alt_compensation(alt)
+alt_compensation = gz.get_base_alt()
+print(f"📍Initial Current location → lat: {lat}, lon: {lon}, actual alt: {alt} compensated alt: {alt_compensation}")
+
+gz.takeoff(master, target_altitude=takeoff_altitude)
+print(f"📍 Takeoff {takeoff_altitude} m location → lat: {lat}, lon: {lon}, actual alt: {takeoff_altitude}")
 
 done = gz.enable_streaming(
     world="delivery_runway",
@@ -37,26 +45,23 @@ if not done:
     print("❌ Failed to enable streaming.")
     exit(1)
 
-os.makedirs(SAVE_DIR, exist_ok=True)
-
-location = gz.get_current_gps_location(master)
-if location is None:
-    print("❌ Failed to get current GPS location.")
-    exit(1)
-
-lat, lon, alt = location
-print(f"📍 Current location → lat: {lat}, lon: {lon}, alt: {alt}")
+# os.makedirs(SAVE_DIR, exist_ok=True)
 
 waypoints = [
+    # (lat + 0.0001, lon + 0.0001, 7),
+    (lat, lon, 10),
+    (lat, lon, 13),
     (lat, lon, 15),
-    (lat + 0.00001, lon + 0.0001, 5),
     (lat, lon, 10),
-    (lat + 0.00001, lon - 0.00001, 5),
-    (lat, lon, 10),
-    (lat - 0.00001, lon - 0.00001, 5),
-    (lat, lon, 10),
-    (lat - 0.00001, lon + 0.00001, 5),
-    (lat, lon, 10),
+    (lat, lon, 13),
+    # (lat + 0.0001, lon + 0.0001, -5),
+    # (lat, lon, 10),
+    # (lat + 0.0001, lon - 0.0001, 5),
+    # (lat, lon, 10),
+    # (lat - 0.0001, lon - 0.0001, 5),
+    # (lat, lon, 10),
+    # (lat - 0.0001, lon + 0.0001, 5),
+    # (lat, lon, 10),
 ]
 
 
@@ -75,7 +80,7 @@ estimator = yolo.YoloObjectTracker(
     )
 for idx, (lat, lon, alt) in enumerate(waypoints):
     # fly to next waypoint
-    gz.goto_waypoint(master, lat, lon, alt, timeout=100)
+    gz.goto_waypoint(master, lat, lon, alt, timeout=100, alt_compensation=alt_compensation)
     print(f"[MAVLINK]  → flying to waypoint {idx} at lat: {lat}, lon: {lon}, alt: {alt}")
 
     while True:
@@ -94,19 +99,20 @@ for idx, (lat, lon, alt) in enumerate(waypoints):
 
         results = estimator.detect(frame)
         coords, center_pose, annotated_frame = estimator.process_frame(results, current_lat, current_lon, alt, object_class="helipad")
-        print(f"[YOLO]  →   detected {len(results)} objects.")
-        if coords is not None:
-            print(f"[YOLO]  →   detected helipad at {coords} with center {center_pose}")
-        else:
-            print(f"[YOLO]  →   no helipad detected.")
+        # print(f"[YOLO]  →   detected {len(results)} objects.")
+        # if coords is not None:
+        #     # print(f"[YOLO]  →   detected helipad at {coords} with center {center_pose}")
+        # else:
+        #     print(f"[YOLO]  →   no helipad detected.")
 
         text_latlon_base = f"current Lat: {current_lat:.6f}, Lon: {current_lon:.6f}"
         if coords is None or center_pose is None:
-            cv2.putText(annotated_frame, text_latlon_base, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
+            cv2.putText(annotated_frame, text_latlon_base, (10, 30), cv2.FONT_HERSHEY_COMPLEX_SMALL,
                     0.7, (0, 255, 0), 2, cv2.LINE_AA)
-            cv2.putText(annotated_frame, "No target detected", (10, 60), cv2.FONT_HERSHEY_SIMPLEX,
+            cv2.putText(annotated_frame, "No target detected", (10, 60), cv2.FONT_HERSHEY_COMPLEX_SMALL,
                         0.7, (0, 0, 255), 2, cv2.LINE_AA)
             cv2.imshow("Annotated Stream", annotated_frame)
+            cv2.waitKey(1) # NOTE: this is important to show the frame, otherwise it will block the stream
             continue
 
         target_lat, target_lon = coords
@@ -115,35 +121,38 @@ for idx, (lat, lon, alt) in enumerate(waypoints):
         text_latlon = f"helipad Lat: {target_lat:.6f}, Lon: {target_lon:.6f}"
         text_center = f"helipad Center: ({cx}, {cy})"
 
-        cv2.putText(annotated_frame, text_latlon_base, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7, (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.putText(annotated_frame, text_latlon_base, (10, 30), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                    0.7, (255, 0, 0), 2, cv2.LINE_AA)
 
-        cv2.putText(annotated_frame, text_latlon, (10, 60), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7, (0, 255, 0), 2, cv2.LINE_AA)
-        cv2.putText(annotated_frame, text_center, (10, 90), cv2.FONT_HERSHEY_SIMPLEX,
-                0.7, (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.putText(annotated_frame, text_latlon, (10, 60), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                    0.7, (255, 0, 0), 2, cv2.LINE_AA)
+        cv2.putText(annotated_frame, text_center, (10, 90), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                0.7, (255, 0, 0), 2, cv2.LINE_AA)
 
         # wait for a bit before capturing the next frame
         cv2.imshow("Annotated Stream", annotated_frame)
+        cv2.waitKey(1) # NOTE: this is important to show the frame, otherwise it will block the stream
 
 
         reached = gz.check_waypoint_reached()
         if reached:
             print(f"  ✅ reached waypoint {idx} at lat: {lat}, lon: {lon}, alt: {alt}")
-            if gz.is_pickup_confirmation_received():
-                print("  ✅ pickup confirmation received.")
-                break
+            # if gz.is_pickup_confirmation_received():
+            #     print("  ✅ pickup confirmation received.")
+            break
         if reached is None:
             print(
                 f"  ❌ failed to reach waypoint {idx} in time going to next waypoint, skipping slice."
             )
             break
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
 
 
 
         time.sleep(PER_CAPTURE)
+    alt_compensation = gz.get_current_gps_location(master)[2]
+    print("[WAITING].....") #TODO: with emoji
+# if cv2.waitKey(1) & 0xFF == ord('q'):
+#     break   time.sleep(10)
 
 cap.release()
 cv2.destroyAllWindows()
