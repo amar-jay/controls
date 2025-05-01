@@ -73,8 +73,9 @@ cap = camera.get_capture()
 
 print(f"[CAMERA]  → width: {width}, height: {height}")
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
 estimator = yolo.YoloObjectTracker(
-    "detection/best.pt", 
+    current_dir + "/detection/best.pt", 
     frame_height=height,
     frame_width=width,
     fov_deg=2, # field of view in degrees, got from the gimbal model.sdf file TODO: check if its in degrees/radians
@@ -102,7 +103,7 @@ for idx, (lat, lon, alt) in enumerate(waypoints):
             continue
 
         results = estimator.detect(frame)
-        coords, center_pose, annotated_frame = estimator.process_frame(results, current_lat, current_lon, alt, object_class="helipad")
+        coords, center_pose, annotated_frame = estimator.process_frame(results, current_lat, current_lon, alt, object_class="helipad", threshold=0.45)
         # print(f"[YOLO]  →   detected {len(results)} objects.")
         # if coords is not None:
         #     # print(f"[YOLO]  →   detected helipad at {coords} with center {center_pose}")

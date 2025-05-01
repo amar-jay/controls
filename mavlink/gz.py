@@ -5,11 +5,14 @@ import math
 import time
 import pymavlink.dialects.v20.all as dialect
 
-def enable_streaming(world="our_runway", model_name="iris_with_gimbal", camera_link="pitch_link") -> bool:
+
+def enable_streaming(
+    world="our_runway", model_name="iris_with_gimbal", camera_link="pitch_link"
+) -> bool:
     """
     Enable streaming for the camera in the Gazebo simulation.
     """
-	
+
     command = [
         "gz",
         "topic",
@@ -53,7 +56,7 @@ def point_gimbal_downward(topic="/gimbal/cmd_tilt", angle=0) -> bool:
         "-p",
         f"data: {angle}",
     ]
-	 
+
     try:
         subprocess.run(
             command,
@@ -88,6 +91,7 @@ def arm(connection):
 
     # Arm the vehicle
     print("Arming motors...")
+    connection.motors_armed_wait()
     connection.mav.command_long_send(
         connection.target_system,
         connection.target_component,
@@ -103,8 +107,8 @@ def arm(connection):
     )
 
     # Wait for arming
-    connection.motors_armed_wait()
     print("Motors armed!")
+
 
 def takeoff(connection, target_altitude=5.0):
     """
@@ -132,6 +136,7 @@ def takeoff(connection, target_altitude=5.0):
 
     print("Takeoff command sent.")
 
+
 class GazeboVideoCapture:
     def __init__(self):
         """
@@ -150,7 +155,9 @@ class GazeboVideoCapture:
         self.cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
 
         if not self.cap.isOpened():
-            raise RuntimeError("Failed to open stream! Check sender or pipeline. pipeline=", pipeline)
+            raise RuntimeError(
+                "Failed to open stream! Check sender or pipeline. pipeline=", pipeline
+            )
 
     def get_capture(self):
         return self.cap
@@ -158,8 +165,9 @@ class GazeboVideoCapture:
     def get_frame_size(self):
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        #fps = self.cap.get(cv2.CAP_PROP_FPS)
+        # fps = self.cap.get(cv2.CAP_PROP_FPS)
         return width, height, None
+
 
 def get_current_gps_location(master, timeout=5.0):
     msg = master.recv_match(type="GLOBAL_POSITION_INT", blocking=True, timeout=timeout)
@@ -265,15 +273,17 @@ def goto_waypoint_sync(
     print("❌ Timeout: did not reach waypoint in time.")
     return False
 
+
 def clear_mav_missions(connection):
     print("[MAVLink] Clearing all missions. Hack...")
     # Clear all missions to prevent interference
-    connection.mav.mission_clear_all_send(connection.target_system, connection.target_component)
+    connection.mav.mission_clear_all_send(
+        connection.target_system, connection.target_component
+    )
     time.sleep(0.5)  # Give the FCU some breathing room
 
     # Set to GUIDED mode explicitly (you can also use MAV_MODE_AUTO if that suits your logic)
     connection.set_mode("GUIDED")  # Or use command_long if you don't have helper
-
 
 
 # Global state
@@ -281,8 +291,16 @@ _waypoint_state = {}
 WAIT_FOR_PICKUP_CONFIRMATION_TIMEOUT = 10  # seconds
 pickup_confirmation_counter = 0
 
+
 def goto_waypoint(
-    master, lat: float, lon: float, alt: float, radius_m=.5, alt_thresh=1.0, timeout=20, alt_compensation=0.0
+    master,
+    lat: float,
+    lon: float,
+    alt: float,
+    radius_m=0.5,
+    alt_thresh=1.0,
+    timeout=20,
+    alt_compensation=0.0,
 ):
     """
     Initiate waypoint navigation. This does not block.
@@ -305,39 +323,37 @@ def goto_waypoint(
     # the drone doesn't have a mode for "goto waypoint"
     # and we can't use the standard MAVLink command
     # because Gazebo doesn't support it
-    master.mav.command_long_send(
-        master.target_system,
-        master.target_component,
-        mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-        0,
-        0,
-        0,
-        0,
-        0,
-        lat,
-        lon,
-        alt + alt_compensation,
-    )
-
-
-
-    # message = dialect.MAVLink_mission_item_int_message(
-    #     target_system=master.target_system,
-    #     target_component=master.target_component,
-    #     seq=0,
-    #     frame=dialect.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
-    #     command=dialect.MAV_CMD_NAV_WAYPOINT,
-    #     current=2,
-    #     autocontinue=0,
-    #     param1=0,
-    #     param2=0,
-    #     param3=0,
-    #     param4=0,
-    #     x = int(lat * 1e7),
-    #     y = int(lon * 1e7),
-    #     z = int(alt), # DOESN'T TAKE alt/1000 nor compensated altitude 
-    #     # z = int(alt)   # in mm
+    # master.mav.command_long_send(
+    #     master.target_system,
+    #     master.target_component,
+    #     mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+    #     0,
+    #     0,
+    #     0,
+    #     0,
+    #     0,
+    #     lat,
+    #     lon,
+    #     alt + alt_compensation,
     # )
+
+    message = dialect.MAVLink_mission_item_int_message(
+        target_system=master.target_system,
+        target_component=master.target_component,
+        seq=0,
+        frame=dialect.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+        command=dialect.MAV_CMD_NAV_WAYPOINT,
+        current=2,
+        autocontinue=0,
+        param1=0,
+        param2=0,
+        param3=0,
+        param4=0,
+        x=int(lat * 1e7),
+        y=int(lon * 1e7),
+        z=int(alt),  # DOESN'T TAKE alt/1000 nor compensated altitude
+        # z = int(alt)   # in mm
+    )
 
     master.mav.send(message)
     print(f"[MAVLink] Sent waypoint → lat={lat}, lon={lon}, alt={alt}")
@@ -383,7 +399,7 @@ def check_waypoint_reached():
 
     current_lat = msg.lat
     current_lon = msg.lon
-    current_alt = msg.alt/1000 - _waypoint_state["alt_compensation"]  # in m
+    current_alt = msg.alt / 1000 - _waypoint_state["alt_compensation"]  # in m
     print(f"{current_alt=} {msg.alt=} {_waypoint_state['alt_compensation']=}")
 
     target_lat = _waypoint_state["target_lat"]
@@ -423,14 +439,12 @@ def check_waypoint_reached():
         # clear_mav_missions(master) # This is a hack to allow multiple waypoints to while bypassing the mission manager
         return True
 
-
     if time.time() - _waypoint_state["start_time"] > _waypoint_state["timeout"]:
         print("❌ Timeout: did not reach waypoint in time.")
         _waypoint_state.clear()
         return None
 
     return False  # Still on the way
-
 
 
 def check_pickup_confirmation():
@@ -447,6 +461,7 @@ def check_pickup_confirmation():
     # Placeholder: always returns True for this example
     return True
 
+
 def is_pickup_confirmation_received():
     """
     Check if the pickup confirmation has been received.
@@ -457,7 +472,7 @@ def is_pickup_confirmation_received():
     # the pickup confirmation. For this placeholder we will wait for 10 captures
     # and then return True.
 
-    if (pickup_confirmation_counter >= WAIT_FOR_PICKUP_CONFIRMATION_TIMEOUT):
+    if pickup_confirmation_counter >= WAIT_FOR_PICKUP_CONFIRMATION_TIMEOUT:
         pickup_confirmation_counter = 0
         return True
     else:
@@ -465,12 +480,15 @@ def is_pickup_confirmation_received():
 
 
 alt_compensation = 0.0  # Global variable to store altitude compensation
-def get_base_alt()->int:
+
+
+def get_base_alt() -> int:
     """
     Get the base altitude compensation value.
     """
     global alt_compensation
     return alt_compensation
+
 
 def update_alt_compensation(alt: int) -> int:
     """

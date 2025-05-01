@@ -3,6 +3,7 @@ import numpy as np
 
 # NOT USED...
 
+
 class DetectSpeed:
     def __init__(self) -> None:
         self.orb = cv2.ORB_create()

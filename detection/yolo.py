@@ -3,6 +3,7 @@ import numpy as np
 from ultralytics import YOLO  # Requires `pip install ultralytics`
 
 
+# get current working directory
 class YoloObjectTracker:
     def __init__(
         self,
@@ -66,7 +67,8 @@ class YoloObjectTracker:
 
         return new_lat, new_lon
 
-    def process_frame(self, detections, current_lat, current_lon, altitude, object_class="helipad"):
+    def process_frame(self, detections, current_lat, current_lon, altitude, object_class="helipad", threshold=0.5):
+        detections.boxes = detections.boxes[detections.boxes.conf > threshold]
         annotated_frame = detections.plot()
         target_box = self.get_target_detection(detections, object_class)
         if target_box is None:

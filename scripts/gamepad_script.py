@@ -1,7 +1,7 @@
 import time
 import pygame
 import mavlink.gz as gz
-from pymavlink import mavutil   
+from pymavlink import mavutil
 
 CONNECTION_STR = "udp:127.0.0.1:14550"
 SAVE_DIR = "captures"  # directory to save images
@@ -14,18 +14,18 @@ print(
 )
 
 
-#gz.arm_and_takeoff(master, target_altitude=10.0)
+# gz.arm_and_takeoff(master, target_altitude=10.0)
 
-#done = gz.point_gimbal_downward()
-#if not done:
+# done = gz.point_gimbal_downward()
+# if not done:
 #    print("❌ Failed to point gimbal downward.")
 #    exit(1)
 
-#done = gz.enable_streaming(
+# done = gz.enable_streaming(
 #    world="delivery_runway",
 #    model_name="iris_with_gimbal",
 #    camera_name="camera")
-#if not done:
+# if not done:
 #    print("❌ Failed to enable streaming.")
 #    exit(1)
 
@@ -39,16 +39,16 @@ lat, lon, alt = location
 print(f"📍 Current location → lat: {lat}, lon: {lon}, alt: {alt}")
 
 
-
 def send_manual_control(x, y, z, r, buttons=0):
     master.mav.manual_control_send(
         master.target_system,
-        x,   # pitch
-        y,   # roll
-        z,   # throttle
-        r,   # yaw
-        buttons
+        x,  # pitch
+        y,  # roll
+        z,  # throttle
+        r,  # yaw
+        buttons,
     )
+
 
 pygame.init()
 pygame.joystick.init()
@@ -58,12 +58,19 @@ joystick.init()
 
 while True:
     pygame.event.pump()
-    print(joystick.get_axis(0), joystick.get_axis(1), joystick.get_axis(2), joystick.get_axis(3))
-    
-    x = int(joystick.get_axis(0) * 1000)   # Roll
-    y = int(joystick.get_axis(1) * 1000)   # Pitch
-    r = int(joystick.get_axis(2) * 1000)   # Yaw
-    z = int(((-joystick.get_axis(3) + 1) / 2) * 1000)  # Throttle (convert -1..1 to 0..1000)
+    print(
+        joystick.get_axis(0),
+        joystick.get_axis(1),
+        joystick.get_axis(2),
+        joystick.get_axis(3),
+    )
+
+    x = int(joystick.get_axis(0) * 1000)  # Roll
+    y = int(joystick.get_axis(1) * 1000)  # Pitch
+    r = int(joystick.get_axis(2) * 1000)  # Yaw
+    z = int(
+        ((-joystick.get_axis(3) + 1) / 2) * 1000
+    )  # Throttle (convert -1..1 to 0..1000)
 
     send_manual_control(x, y, z, r)
     time.sleep(0.05)

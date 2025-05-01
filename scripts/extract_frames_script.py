@@ -2,18 +2,17 @@ import cv2
 import os
 
 
-
 def center_crop_and_resize(image, size=640):
     h, w = image.shape[:2]
-    
+
     # Step 1: Center crop to square
     if h > w:
         top = (h - w) // 2
-        cropped = image[top:top + w, :]
+        cropped = image[top : top + w, :]
     else:
         left = (w - h) // 2
-        cropped = image[:, left:left + h]
-    
+        cropped = image[:, left : left + h]
+
     # Step 2: Resize to target size
     resized = cv2.resize(cropped, (size, size), interpolation=cv2.INTER_AREA)
     return resized

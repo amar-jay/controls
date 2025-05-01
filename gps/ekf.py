@@ -159,7 +159,6 @@ class GeoFilter:
         return None
 
     def compute_gps(self, drone_pos, drone_vel=np.zeros(3)):
-
         # check if the input is a tuple or numpy array
         if isinstance(drone_pos, tuple):
             drone_pos = np.array(drone_pos)
