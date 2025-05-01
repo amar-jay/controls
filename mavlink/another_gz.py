@@ -1,4 +1,4 @@
-import gz
+import controls.mavlink.gz as gz
 from pymavlink import mavutil
 import pymavlink.dialects.v20.all as dialect
 import time
@@ -80,13 +80,9 @@ def start_mission(master):
     ack_sync(master, "COMMAND_ACK")
 
 
-def clear_mission(master):
-    # Clear mission
-    master.mav.mission_clear_all_send(master.target_system, master.target_component)
-    ack_sync(master, "MISSION_ACK")
 
 
-def return_back(master):
+def return_to_launch(master):
     master.mav.command_long_send(
         master.target_system,
         master.target_component,
@@ -243,6 +239,6 @@ if __name__ == "__main__":
             # else:
             #    print(f"Waypoint {i} not reached yet.")
             #    time.sleep(1)
-        return_back(master)
+        return_to_launch(master)
     except Exception as e:
         print(f"Error during mission upload: {e}")

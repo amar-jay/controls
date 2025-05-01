@@ -71,29 +71,37 @@ def point_gimbal_downward(topic="/gimbal/cmd_tilt", angle=0) -> bool:
         print("Error:", e.stderr)
         return False
 
+def _set_mode(master, mode):
+    mode_id = master.mode_mapping()[mode]
+    master.set_mode(mode_id)
 
-def arm(connection):
+def ack_sync(master, msg):
+    while True:
+        m = master.recv_match(type=msg, blocking=True)
+        if m is not None:
+            if m.get_type() == msg:
+               return
+            print(f"Received {m.get_type()} instead of {msg}")
+        else:
+            continue
+def arm(master):
     """
     Arms the vehicle and sets it to GUIDED mode.
-
-    Parameters:
-        connection: The MAVLink connection object.
     """
     # Wait for a heartbeat from the vehicle
     print("Waiting for heartbeat...")
-    connection.wait_heartbeat()
-    print(f"Heartbeat received from system {connection.target_system}")
+    master.wait_heartbeat()
+    print(f"Heartbeat received from system {master.target_system}")
 
     # Set mode to GUIDED (or equivalent)
     mode = "GUIDED"
-    mode_id = connection.mode_mapping()[mode]
-    connection.set_mode(mode_id)
+    _set_mode(master, mode)
 
     # Arm the vehicle
     print("Arming motors...")
-    connection.mav.command_long_send(
-        connection.target_system,
-        connection.target_component,
+    master.mav.command_long_send(
+        master.target_system,
+        master.target_component,
         mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
         0,  # Confirmation
         1,
@@ -105,21 +113,21 @@ def arm(connection):
         0,  # Arm (1 to arm, 0 to disarm)
     )
 
-    connection.motors_armed_wait()
+    master.motors_armed_wait()
     # Wait for arming
-    print("Motors armed!")
+    print("Vehicle armed!")
 
 
-def takeoff(connection, target_altitude=5.0):
+def takeoff(master, target_altitude=5.0):
     """
     Initiates takeoff to target altitude in meters.
     """
 
     # Send takeoff command
     print(f"Taking off to {target_altitude} meters...")
-    connection.mav.command_long_send(
-        connection.target_system,
-        connection.target_component,
+    master.mav.command_long_send(
+        master.target_system,
+        master.target_component,
         mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
         0,  # Confirmation
         0,
@@ -136,6 +144,83 @@ def takeoff(connection, target_altitude=5.0):
 
     print("Takeoff command sent.")
 
+def return_to_launch(master):
+    master.mav.command_long_send(
+        master.target_system,
+        master.target_component,
+        mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
+        0,  # Confirmation
+        0,  # Param1: unused
+        0,  # Param2: unused
+        0,  # Param3: unused
+        0,  # Param4: unused
+        0,  # Param5: unused
+        0,  # Param6: unused
+        0,  # Param7: unused
+    )
+    ack_sync(master, "COMMAND_ACK")
+
+
+def clear_mission(master):
+    # Clear mission
+    master.mav.mission_clear_all_send(master.target_system, master.target_component)
+    ack_sync(master, "MISSION_ACK")
+
+from pymavlink import mavutil
+
+def get_status(mav):
+    status = {
+        "connected": False,
+        "armed": False,
+        "flying": False,
+        "position": None,
+        "mission_active": False,
+        "current_waypoint": None,
+        "total_waypoints": 0,
+        "battery": None
+    }
+
+    # Try receiving a few messages quickly
+    for _ in range(20):
+        msg = mav.recv_match(type=[
+            "HEARTBEAT",
+            "GLOBAL_POSITION_INT",
+            "MISSION_CURRENT",
+            "MISSION_COUNT",
+            "BATTERY_STATUS"
+        ], blocking=False)
+
+        if not msg:
+            continue
+
+        if msg.get_type() == "HEARTBEAT":
+            status["connected"] = True
+            status["armed"] = bool(msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
+            status["flying"] = msg.system_status == mavutil.mavlink.MAV_STATE_ACTIVE
+
+        elif msg.get_type() == "GLOBAL_POSITION_INT":
+            status["position"] = {
+                "lat": msg.lat / 1e7,
+                "lon": msg.lon / 1e7,
+                "alt": msg.alt / 1e3
+            }
+
+        elif msg.get_type() == "MISSION_CURRENT":
+            status["current_waypoint"] = msg.seq
+            status["mission_active"] = msg.seq > 0  # or some other logic
+
+        elif msg.get_type() == "MISSION_COUNT":
+            status["total_waypoints"] = msg.count
+
+        elif msg.get_type() == "BATTERY_STATUS":
+            voltages = [v for v in msg.voltages if v != 0xFFFF]
+            status["battery"] = {
+                "voltage": sum(voltages) / 1000 if voltages else None,
+                "current": msg.current_battery / 100.0,
+                "remaining": msg.battery_remaining
+            }
+
+    return status
 
 class GazeboVideoCapture:
     def __init__(self):
@@ -206,8 +291,8 @@ def goto_waypoint_sync(
     """
     Send drone to waypoint (lat, lon, alt) and wait until it's close enough.
 
-    Args:
-        master: MAVLink connection (pymavlink instance).
+    Args
+        master: MAVLink Connection (pymavlink instance).
         lat, lon: Target latitude/longitude in degrees.
         alt: Target altitude in meters (AMSL).
         radius_m: Horizontal threshold in meters to consider "arrived".
@@ -274,16 +359,16 @@ def goto_waypoint_sync(
     return False
 
 
-def clear_mav_missions(connection):
+def clear_mav_missions(master):
     print("[MAVLink] Clearing all missions. Hack...")
     # Clear all missions to prevent interference
-    connection.mav.mission_clear_all_send(
-        connection.target_system, connection.target_component
+    master.mav.mission_clear_all_send(
+        master.target_system, master.target_component
     )
     time.sleep(0.5)  # Give the FCU some breathing room
 
     # Set to GUIDED mode explicitly (you can also use MAV_MODE_AUTO if that suits your logic)
-    connection.set_mode("GUIDED")  # Or use command_long if you don't have helper
+    master.set_mode("GUIDED")  # Or use command_long if you don't have helper
 
 
 # Global state

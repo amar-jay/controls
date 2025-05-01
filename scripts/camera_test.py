@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import cv2
 import time
-import mavlink.gz as gz
+import controls.mavlink.gz as gz
 import detection.yolo as yolo
 import logging
 

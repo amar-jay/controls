@@ -1,6 +1,6 @@
 import time
 import pygame
-import mavlink.gz as gz
+import controls.mavlink.gz as gz
 from pymavlink import mavutil
 
 CONNECTION_STR = "udp:127.0.0.1:14550"
