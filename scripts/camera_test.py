@@ -1,9 +1,15 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import cv2
 import time
 import mavlink.gz as gz
 import detection.yolo as yolo
 import logging
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
+
+# print(cv2.getBuildInformation())
 
 pipeline = (
     "udpsrc port=5600 ! "
@@ -32,24 +38,19 @@ if not done:
 
 
 
-
 camera = gz.GazeboVideoCapture()
 
 width, height, _ = camera.get_frame_size()
 cap = camera.get_capture()
 
 estimator = yolo.YoloObjectTracker(
-    "best.pt", 
+    "detection/best.pt", 
     frame_height=height,
     frame_width=width,
     fov_deg=2, # field of view in degrees, got from the gimbal model.sdf file TODO: check if its in degrees/radians
     )
 
 print(f"[CAMERA]  → width: {width}, height: {height}")
-
-if not cap.isOpened():
-    print("Failed to open stream! Check sender or pipeline.")
-    exit()
 
 while True:
     ret, frame = cap.read()

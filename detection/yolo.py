@@ -6,7 +6,7 @@ from ultralytics import YOLO  # Requires `pip install ultralytics`
 class YoloObjectTracker:
     def __init__(
         self,
-        model_path="yolov8s.pt",
+        model_path="detection/best.pt",
         fov_deg=1,
         frame_width=640,
         frame_height=640,
@@ -87,8 +87,8 @@ if __name__ == "__main__":
     import logging
     logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
-    input_video_path = "input_video2.mp4"  # Path to your input video
-    output_video_path = "output.mp4"  # Path to your input video
+    input_video_path = "assets/input_video2.mp4"  # Path to your input video
+    output_video_path = "assets/output.mp4"  # Path to your input video
 
     # Read the image using PIL and convert to numpy array
     # image_np = np.array(Image.open(random_test_image_path).convert("RGB"))
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     )
 
     # Load YOLO model
-    estimator = YoloObjectTracker("best.pt")
+    estimator = YoloObjectTracker("detection/best.pt")
 
     while True:
         ret, frame = cap.read()
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     # print(f"Annotated image saved to output.jpg")
 
     # # Create tracker and run detection
-    # estimator = YoloObjectTracker("best.pt")
+    # estimator = YoloObjectTracker("detection/best.pt")
     # result_frame = estimator.detect(image_np)  # detect expects numpy frame
     # print(f"{result_frame=}")
 

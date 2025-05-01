@@ -30,10 +30,12 @@ def enable_streaming(world="our_runway", model_name="iris_with_gimbal", camera_l
             stderr=subprocess.PIPE,
             text=True,
         )
+        print("The current gimbal topic is", command[3])
         print("🦾 Gazebo gimbal streaming enabled...", result.stdout)
         return True
     except subprocess.CalledProcessError as e:
         print("Error:", e.stderr)
+        print("The current topic is", command[2])
         return False
 
 
@@ -146,10 +148,9 @@ class GazeboVideoCapture:
         )
 
         self.cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
-        print(self.cap)
 
         if not self.cap.isOpened():
-            raise RuntimeError("Failed to open stream! Check sender or pipeline.")
+            raise RuntimeError("Failed to open stream! Check sender or pipeline. pipeline=", pipeline)
 
     def get_capture(self):
         return self.cap
@@ -304,39 +305,39 @@ def goto_waypoint(
     # the drone doesn't have a mode for "goto waypoint"
     # and we can't use the standard MAVLink command
     # because Gazebo doesn't support it
-    # master.mav.command_long_send(
-    #     master.target_system,
-    #     master.target_component,
-    #     mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-    #     0,
-    #     0,
-    #     0,
-    #     0,
-    #     0,
-    #     lat,
-    #     lon,
-    #     alt,
-    # )
-
-
-
-    message = dialect.MAVLink_mission_item_int_message(
-        target_system=master.target_system,
-        target_component=master.target_component,
-        seq=0,
-        frame=dialect.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
-        command=dialect.MAV_CMD_NAV_WAYPOINT,
-        current=2,
-        autocontinue=0,
-        param1=0,
-        param2=0,
-        param3=0,
-        param4=0,
-        x = int(lat * 1e7),
-        y = int(lon * 1e7),
-        z = int(alt), # DOESN'T TAKE alt/1000 nor compensated altitude 
-        # z = int(alt)   # in mm
+    master.mav.command_long_send(
+        master.target_system,
+        master.target_component,
+        mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+        0,
+        0,
+        0,
+        0,
+        0,
+        lat,
+        lon,
+        alt + alt_compensation,
     )
+
+
+
+    # message = dialect.MAVLink_mission_item_int_message(
+    #     target_system=master.target_system,
+    #     target_component=master.target_component,
+    #     seq=0,
+    #     frame=dialect.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+    #     command=dialect.MAV_CMD_NAV_WAYPOINT,
+    #     current=2,
+    #     autocontinue=0,
+    #     param1=0,
+    #     param2=0,
+    #     param3=0,
+    #     param4=0,
+    #     x = int(lat * 1e7),
+    #     y = int(lon * 1e7),
+    #     z = int(alt), # DOESN'T TAKE alt/1000 nor compensated altitude 
+    #     # z = int(alt)   # in mm
+    # )
 
     master.mav.send(message)
     print(f"[MAVLink] Sent waypoint → lat={lat}, lon={lon}, alt={alt}")

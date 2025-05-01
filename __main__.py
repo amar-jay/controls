@@ -74,7 +74,7 @@ cap = camera.get_capture()
 print(f"[CAMERA]  → width: {width}, height: {height}")
 
 estimator = yolo.YoloObjectTracker(
-    "best.pt", 
+    "detection/best.pt", 
     frame_height=height,
     frame_width=width,
     fov_deg=2, # field of view in degrees, got from the gimbal model.sdf file TODO: check if its in degrees/radians

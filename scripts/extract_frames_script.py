@@ -70,6 +70,8 @@ def extract_frames(video_path, output_folder, interval_ms):
 
 if __name__ == "__main__":
     # Example usage
-    video_file = "input_video.mp4"
-    output_dir = "frames"
+    video_file = "assets/input_video.mp4"
+    output_dir = "assets/frames"
+
+    os.makedirs(output_dir, exist_ok=True)
     extract_frames(video_file, output_dir, interval_ms=1000)  # Extract every 1 second

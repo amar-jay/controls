@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import numpy as np
 from detection.angular import compute_angles, compute_target_gps
 from gps.ekf import GeoFilter
