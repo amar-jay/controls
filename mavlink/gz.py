@@ -91,7 +91,6 @@ def arm(connection):
 
     # Arm the vehicle
     print("Arming motors...")
-    connection.motors_armed_wait()
     connection.mav.command_long_send(
         connection.target_system,
         connection.target_component,
@@ -106,6 +105,7 @@ def arm(connection):
         0,  # Arm (1 to arm, 0 to disarm)
     )
 
+    connection.motors_armed_wait()
     # Wait for arming
     print("Motors armed!")
 

@@ -13,7 +13,7 @@ logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
 CONNECTION_STR = "udp:127.0.0.1:14550"
 SAVE_DIR = "captures"  # directory to save images
-PER_CAPTURE = .3  # time in seconds to wait between captures
+PER_CAPTURE = .05  # time in seconds to wait between captures
 
 master = mavutil.mavlink_connection(CONNECTION_STR)
 master.wait_heartbeat()
@@ -50,19 +50,19 @@ if not done:
 
 waypoints = [
     # (lat + 0.0001, lon + 0.0001, 7),
+    # (lat, lon, 10),
+    # (lat, lon, 13),
+    # (lat, lon, 15),
+    # (lat, lon, 10),
+    # (lat, lon, 13),
+    (lat + 0.0001, lon + 0.0001, 5),
     (lat, lon, 10),
-    (lat, lon, 13),
-    (lat, lon, 15),
+    (lat + 0.0001, lon - 0.0001, 5),
     (lat, lon, 10),
-    (lat, lon, 13),
-    # (lat + 0.0001, lon + 0.0001, -5),
-    # (lat, lon, 10),
-    # (lat + 0.0001, lon - 0.0001, 5),
-    # (lat, lon, 10),
-    # (lat - 0.0001, lon - 0.0001, 5),
-    # (lat, lon, 10),
-    # (lat - 0.0001, lon + 0.0001, 5),
-    # (lat, lon, 10),
+    (lat - 0.0001, lon - 0.0001, 5),
+    (lat, lon, 10),
+    (lat - 0.0001, lon + 0.0001, 15),
+    (lat, lon, 10),
 ]
 
 
@@ -103,7 +103,7 @@ for idx, (lat, lon, alt) in enumerate(waypoints):
             continue
 
         results = estimator.detect(frame)
-        coords, center_pose, annotated_frame = estimator.process_frame(results, current_lat, current_lon, alt, object_class="helipad", threshold=0.45)
+        coords, center_pose, annotated_frame = estimator.process_frame(results, current_lat, current_lon, alt, object_class="helipad", threshold=0.5)
         # print(f"[YOLO]  →   detected {len(results)} objects.")
         # if coords is not None:
         #     # print(f"[YOLO]  →   detected helipad at {coords} with center {center_pose}")
