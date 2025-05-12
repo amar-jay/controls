@@ -30,11 +30,11 @@ lat, lon, alt = filter.compute_gps(np.array([red_lat, red_lon, 0]))
 
 scale = 1e-10
 for _ in range(10000):
-    lat += scale * 1e-5 * np.random.randint(0, int(1e5))
-    lon += scale * 1e-5 * np.random.randint(0, int(1e5))
-    alt += scale * 1e-5 * np.random.randint(0, int(1e5))
-    lat, lon, alt = filter.compute_gps(np.array([lat, lon, alt]))
+	lat += scale * 1e-5 * np.random.randint(0, int(1e5))
+	lon += scale * 1e-5 * np.random.randint(0, int(1e5))
+	alt += scale * 1e-5 * np.random.randint(0, int(1e5))
+	lat, lon, alt = filter.compute_gps(np.array([lat, lon, alt]))
 
 print(
-    f"Drone: {X=}, {Y=}, {Z=}\nAngles: {azimuth=} {elevation=}\nTarget: Latitude = {red_lat}, Longitude = {red_lon}\nEstimate: Latitude = {lat}, Longitude = {lon} Altitude={alt}\n"
+	f"Drone: {X=}, {Y=}, {Z=}\nAngles: {azimuth=} {elevation=}\nTarget: Latitude = {red_lat}, Longitude = {red_lon}\nEstimate: Latitude = {lat}, Longitude = {lon} Altitude={alt}\n"
 )
