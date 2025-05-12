@@ -1,4 +1,5 @@
-import controls.mavlink.gz as gz
+#import mavlink.gz as gz
+import gz
 from pymavlink import mavutil
 import pymavlink.dialects.v20.all as dialect
 import time
@@ -222,23 +223,8 @@ if __name__ == "__main__":
     print(f"📍 Waypoints: {waypoints}")
 
     try:
-        clear_mission(master)
+        gz.clear_mission(master)
         time.sleep(1)
-        upload_mission(master, waypoints)
-        time.sleep(1)
-        start_mission(master)
-
-        for i in range(len(waypoints)):
-            print(f"Waiting for waypoint {i} to be reached...")
-
-            # reached = check_waypoint_reached(master, i+1, waypoint.x, waypoint.y, waypoint.z)
-            ack_sync(master, "MISSION_ITEM_REACHED")
-            time.sleep(1)
-            # if reached:
-            #    print(f"Waypoint {i} reached.")
-            # else:
-            #    print(f"Waypoint {i} not reached yet.")
-            #    time.sleep(1)
         return_to_launch(master)
     except Exception as e:
         print(f"Error during mission upload: {e}")

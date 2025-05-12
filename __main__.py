@@ -4,7 +4,7 @@ from pymavlink import mavutil
 import math
 import time
 import detection.yolo as yolo
-from controls.mavlink import gz
+from mavlink import gz
 import logging
 from gps.ekf import GeoFilter
 
