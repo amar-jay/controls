@@ -75,6 +75,7 @@ class ArdupilotConnection:
 		self.master.motors_armed_wait()
 		# Wait for arming
 		self.log("Vehicle armed!")
+
 	def disarm(self):
 		"""
 		Disarms the vehicle.
@@ -148,7 +149,9 @@ class ArdupilotConnection:
 		)
 		self.ack_sync("MISSION_REQUEST")
 		for i, waypoint in enumerate(waypoints):
-			print(f"Uploading waypoint {i}: lat={waypoint.lat}, lon={waypoint.lon}, alt={waypoint.alt}, hold={waypoint.hold}")
+			print(
+				f"Uploading waypoint {i}: lat={waypoint.lat}, lon={waypoint.lon}, alt={waypoint.alt}, hold={waypoint.hold}"
+			)
 			# send mission item
 			self.master.mav.mission_item_send(
 				target_system=self.master.target_system,  # System ID
