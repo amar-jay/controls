@@ -6,6 +6,47 @@ import cv2
 from pymavlink import mavutil
 
 
+class GazeboVideoCapture:
+	def __init__(self, camera_port=5600):
+		"""
+		Open a video stream from the Gazebo simulation.
+		"""
+		pipeline = (
+			f"udpsrc port={camera_port} ! "
+			"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96 ! "
+			"rtph264depay ! "
+			"h264parse ! "
+			"avdec_h264 ! "
+			"videoconvert ! "
+			"appsink drop=1"
+		)
+
+		self.cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+
+		if not self.cap.isOpened():
+			raise RuntimeError(
+				"Failed to open stream! Check sender or pipeline. pipeline=", pipeline
+			)
+		# move all methods of self.cap to self
+
+	def __getattr__(self, name):
+		"""
+		        Forward any undefined attribute access to self.cap
+		This will automatically delegate any method calls not defined in this class
+		to the underlying cv2.VideoCapture object.
+		"""
+		return getattr(self.cap, name)
+
+	def get_capture(self):
+		return self.cap
+
+	def get_frame_size(self):
+		width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+		height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+		# fps = self.cap.get(cv2.CAP_PROP_FPS)
+		return width, height, None
+
+
 class GazeboConnection(ArdupilotConnection):
 	def __init__(
 		self,
@@ -27,36 +68,6 @@ class GazeboConnection(ArdupilotConnection):
 		self.world = world
 		self.cap = None
 		self.camera_port = camera_port
-
-	def _camera_init(self, camera_port):
-		"""
-		Open a video stream from the Gazebo simulation.
-		"""
-		pipeline = (
-			f"udpsrc port={camera_port} ! "
-			"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96 ! "
-			"rtph264depay ! "
-			"h264parse ! "
-			"avdec_h264 ! "
-			"videoconvert ! "
-			"appsink drop=1"
-		)
-
-		self.cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
-
-		if not self.cap.isOpened():
-			raise RuntimeError(
-				"Failed to open stream! Check sender or pipeline. pipeline=", pipeline
-			)
-
-	def get_capture(self):
-		return self.cap
-
-	def get_frame_size(self):
-		width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-		height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-		# fps = self.cap.get(cv2.CAP_PROP_FPS)
-		return width, height, None
 
 	def enable_streaming(self) -> bool:
 		"""
@@ -88,8 +99,8 @@ class GazeboConnection(ArdupilotConnection):
 			)
 			self.log("The current gimbal topic is", command[3])
 			time.sleep(0.5)
+			self.cap = GazeboVideoCapture(camera_port=self.camera_port)
 
-			self._camera_init(self.camera_port)
 			self.log("🦾 Gazebo gimbal streaming enabled...", result.stdout)
 
 			return True
@@ -246,7 +257,7 @@ if __name__ == "__main__":
 
 	connection.goto_waypoint(_lat + 0.00001, _lon + 0.00001, 3)
 
-	camera = connection.get_capture()
+	camera = connection.cap.get_capture()
 
 	while True:
 		if connection.check_reposition_reached():

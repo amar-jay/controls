@@ -82,17 +82,17 @@ class ArdupilotConnection:
 		"""
 		self.log("Disarming motors...")
 		self.master.mav.command_long_send(
-		    self.master.target_system,
-		    self.master.target_component,
-		    mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-		    0,  # Confirmation
-		    0,  # Disarm (1 to arm, 0 to disarm)
-		    0,  # param2 (force, can be set to 21196 to force disarming)
-		    0,  # param3 (unused)
-		    0,  # param4 (unused)
-		    0,  # param5 (unused)
-		    0,  # param6 (unused)
-		    0   # param7 (unused)
+			self.master.target_system,
+			self.master.target_component,
+			mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+			0,  # Confirmation
+			0,  # Disarm (1 to arm, 0 to disarm)
+			0,  # param2 (force, can be set to 21196 to force disarming)
+			0,  # param3 (unused)
+			0,  # param4 (unused)
+			0,  # param5 (unused)
+			0,  # param6 (unused)
+			0,  # param7 (unused)
 		)
 
 		self.master.motors_disarmed_wait()
@@ -495,7 +495,9 @@ class ArdupilotConnection:
 
 		return False
 
-	def monitor_mission_progress(self, timeout=600, _update_status_hook=None, in_loop=True):
+	def monitor_mission_progress(
+		self, timeout=600, _update_status_hook=None, in_loop=True
+	):
 		self.log("Starting mission monitoring...")
 		current_waypoint = 0
 		total_waypoints = None
@@ -528,6 +530,7 @@ class ArdupilotConnection:
 							_update_status_hook(current_waypoint, True)
 						return True
 			return False
+
 		if in_loop:
 			start_time = time.time()
 			while time.time() - start_time < timeout:
