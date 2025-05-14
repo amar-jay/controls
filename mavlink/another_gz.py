@@ -2,7 +2,7 @@ import time
 from pymavlink import mavutil
 import pymavlink.dialects.v20.all as dialect
 import gz
-from mission_types import Waypoint
+from .mission_types import Waypoint
 
 
 def return_to_launch(connection):
@@ -40,7 +40,9 @@ if __name__ == "__main__":
 	connection.arm()
 	connection.takeoff(10)
 	lat, lon, alt = connection.get_current_gps_location()
-	connection.log(f"📍Initial Current location → lat: {lat}, lon: {lon}, actual alt: {alt}")
+	connection.log(
+		f"📍Initial Current location → lat: {lat}, lon: {lon}, actual alt: {alt}"
+	)
 
 	_waypoints = [
 		Waypoint(lat + 0.00001, lon + 0.00001, 3),

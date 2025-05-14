@@ -1,4 +1,4 @@
-from ardupilot import ArdupilotConnection
+from .ardupilot import ArdupilotConnection
 import time
 import subprocess
 import math
@@ -87,7 +87,7 @@ class GazeboConnection(ArdupilotConnection):
 				text=True,
 			)
 			self.log("The current gimbal topic is", command[3])
-			time.sleep(.5)
+			time.sleep(0.5)
 
 			self._camera_init(self.camera_port)
 			self.log("🦾 Gazebo gimbal streaming enabled...", result.stdout)
@@ -99,7 +99,6 @@ class GazeboConnection(ArdupilotConnection):
 			return False
 		except Exception as e:
 			self.log("Error:", e)
-
 
 	def point_gimbal_downward(self, topic="/gimbal/cmd_tilt", angle=0) -> bool:
 		"""
@@ -230,7 +229,9 @@ if __name__ == "__main__":
 	# Example usage
 	connection = GazeboConnection(
 		connection_string="udp:127.0.0.1:14550",
-        world="delivery_runway",
+		world="delivery_runway",
+		camera_link="tilt_link",
+		model_name="iris_with_stationary_gimbal",
 	)
 
 	connection.arm()
@@ -248,13 +249,19 @@ if __name__ == "__main__":
 	camera = connection.get_capture()
 
 	while True:
-		if connection.check_waypoint_reached():
+		if connection.check_reposition_reached():
 			connection.log("Waypoint reached!")
 			break
-		time.sleep(1)
-		frame = camera.read()
-		if frame is not None:
-			cv2.imshow("Gazebo Video Stream", frame)
+		ret, frame = camera.read()
+		if not ret:
+			connection.log("Failed to capture frame.")
+			break
+		cv2.imshow("Gazebo Video Stream", frame)
+		# Process window events and check for exit key (q)
+		key = cv2.waitKey(30) & 0xFF  # 30ms delay between frames
+		if key == ord("q"):
+			connection.log("User exited video stream.")
+			break
 	connection.return_to_launch()
 	connection.clear_mission()
 	connection.master.close()
