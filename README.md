@@ -81,7 +81,3 @@ To control the drone manually using a gamepad, use the script `scripts/gamepad_s
 * `requirements.txt`: List of required Python packages.
 * `.gitignore`: Git ignore file.
 
-### Commands
-```
-python3 -m src.controls.mavlink.gz # test gazebo simulation and video streaming
-```

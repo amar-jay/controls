@@ -138,6 +138,22 @@ class ArdupilotConnection:
 			0,  # Param7: unused
 		)
 		self.ack_sync("COMMAND_ACK")
+	def land(self):
+		self.log("Landing...")
+		self.master.mav.command_long_send(
+			self.master.target_system,
+			self.master.target_component,
+			mavutil.mavlink.MAV_CMD_NAV_LAND,
+			0,  # Confirmation
+			0,  # Param1: unused
+			0,  # Param2: unused
+			0,  # Param3: unused
+			0,  # Param4: unused
+			0,  # Param5: unused
+			0,  # Param6: unused
+			0,  # Param7: unused
+		)
+		self.ack_sync("COMMAND_ACK")
 
 	def upload_mission(self, waypoints: list[Waypoint], relative=False):
 		num_wp = len(waypoints)
