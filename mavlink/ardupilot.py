@@ -82,16 +82,17 @@ class ArdupilotConnection:
 		"""
 		self.log("Disarming motors...")
 		self.master.mav.command_long_send(
-			self.master.target_system,
-			self.master.target_component,
-			mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-			0,  # Confirmation
-			0,
-			0,
-			0,
-			0,
-			0,
-			0,  # Disarm (1 to arm, 0 to disarm)
+		    self.master.target_system,
+		    self.master.target_component,
+		    mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+		    0,  # Confirmation
+		    0,  # Disarm (1 to arm, 0 to disarm)
+		    0,  # param2 (force, can be set to 21196 to force disarming)
+		    0,  # param3 (unused)
+		    0,  # param4 (unused)
+		    0,  # param5 (unused)
+		    0,  # param6 (unused)
+		    0   # param7 (unused)
 		)
 
 		self.master.motors_disarmed_wait()
@@ -138,6 +139,7 @@ class ArdupilotConnection:
 			0,  # Param7: unused
 		)
 		self.ack_sync("COMMAND_ACK")
+
 	def land(self):
 		self.log("Landing...")
 		self.master.mav.command_long_send(
@@ -493,20 +495,20 @@ class ArdupilotConnection:
 
 		return False
 
-	def monitor_mission_progress(self, timeout=600, _update_status_hook=None):
+	def monitor_mission_progress(self, timeout=600, _update_status_hook=None, in_loop=True):
 		self.log("Starting mission monitoring...")
-		start_time = time.time()
 		current_waypoint = 0
 		total_waypoints = None
 
-		while time.time() - start_time < timeout:
+		def func():
+			nonlocal current_waypoint, total_waypoints
 			msg = self.master.recv_match(
 				type=["MISSION_CURRENT", "MISSION_COUNT"], blocking=False
 			)
 
 			if not msg:
 				time.sleep(0.1)
-				continue
+				return False
 
 			if msg.get_type() == "MISSION_COUNT":
 				total_waypoints = msg.count
@@ -525,8 +527,15 @@ class ArdupilotConnection:
 						if _update_status_hook:
 							_update_status_hook(current_waypoint, True)
 						return True
-
-			time.sleep(0.1)
+			return False
+		if in_loop:
+			start_time = time.time()
+			while time.time() - start_time < timeout:
+				if func():
+					return True
+				time.sleep(0.1)
+		else:
+			return func()
 
 		self.log("❌ Mission monitoring timed out")
 		return False
