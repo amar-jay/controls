@@ -1,4 +1,4 @@
-import math
+from math import degrees
 import time
 from pymavlink import mavutil
 import pymavlink.dialects.v20.all as dialect
@@ -20,8 +20,11 @@ class ArdupilotConnection:
 		self.connection_string = connection_string
 		self.target_system = 1
 		self.target_component = 1
-		self.master = mavutil.mavlink_connection(connection_string)
-		self.master.wait_heartbeat(wait_heartbeat)
+		print(">> ", connection_string)
+		self.master = mavutil.mavlink_connection(connection_string, baudrate=57600)
+		print("wawiting...")
+		self.master.wait_heartbeat()
+		print("connected !!!!")
 		self.log = lambda *args: logger(*args) if logger else print("[MAVLink] ", *args)
 		self.log(
 			f"Connected to {self.connection_string} with system ID {self.master.target_system}"
@@ -72,9 +75,16 @@ class ArdupilotConnection:
 			0,  # Arm (1 to arm, 0 to disarm)
 		)
 
-		self.master.motors_armed_wait()
+		# self.master.motors_armed_wait()
 		# Wait for arming
 		self.log("Vehicle armed!")
+
+	def safety_switch(self, state):
+		self.master.mav.set_mode_send(
+			self.master.target_system,
+			mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
+			1 if state else 0,
+		)
 
 	def disarm(self):
 		"""
@@ -185,8 +195,8 @@ class ArdupilotConnection:
 				param2=0,  # Acceptance radius (if the sphere with this radius is hit, the waypoint counts as reached)
 				param3=0,  # 	Pass the waypoint to the next waypoint (0 = no, 1 = yes)
 				param4=0,  # Desired yaw angle at waypoint (rotary wing). NaN to use the current system yaw heading mode (e.g. yaw towards next waypoint, yaw to home, etc.).
-				x=waypoint.lat + self.home_position[0],  # Latitude in degrees * 1E7
-				y=waypoint.lon + self.home_position[1],  # Longitude in degrees * 1E7
+				x=waypoint.lat,  # Latitude in degrees * 1E7
+				y=waypoint.lon,  # Longitude in degrees * 1E7
 				z=waypoint.alt,  # Altitude in meters (AMSL) DOESN'T TAKE alt/1000 nor compensated altitude
 			)
 			if i != num_wp - 1:
@@ -240,10 +250,12 @@ class ArdupilotConnection:
 
 	def get_status(self):
 		status = {
+			"mode": self.master.flightmode,
 			"connected": False,
 			"armed": False,
 			"flying": False,
 			"position": None,
+			"orientation": None,
 			"mission_active": False,
 			"current_waypoint": None,
 			"total_waypoints": 0,
@@ -268,9 +280,7 @@ class ArdupilotConnection:
 
 			if msg.get_type() == "HEARTBEAT":
 				status["connected"] = True
-				status["armed"] = bool(
-					msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED
-				)
+				status["armed"] = self.master.motors_armed()
 				status["flying"] = msg.system_status == mavutil.mavlink.MAV_STATE_ACTIVE
 
 			elif msg.get_type() == "GLOBAL_POSITION_INT":
@@ -279,7 +289,12 @@ class ArdupilotConnection:
 					"lon": msg.lon / 1e7,
 					"alt": msg.alt / 1e3,
 				}
-
+			elif msg.get_type() == "ATTITUDE":
+				status["orientation"] = {
+					"roll": degrees(msg.roll),
+					"pitch": degrees(msg.pitch),
+					"yaw": degrees(msg.yaw),
+				}
 			elif msg.get_type() == "MISSION_CURRENT":
 				status["current_waypoint"] = msg.seq
 				status["mission_active"] = msg.seq > 0  # or some other logic
@@ -294,6 +309,7 @@ class ArdupilotConnection:
 					"current": msg.current_battery / 100.0,
 					"remaining": msg.battery_remaining,
 				}
+			status["mode"] = self.master.flightmode
 
 		return status
 
