@@ -88,7 +88,11 @@ class ArdupilotConnection:
 		self.log("Vehicle armed!")
 
 	def safety_switch(self, state):
-		self.master.mav.set_mode_send(self.master.target_system, mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY, 1 if state else 0)
+		self.master.mav.set_mode_send(
+			self.master.target_system,
+			mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
+			1 if state else 0,
+		)
 		# self.ack_sync("COMMAND_ACK")
 
 	def disarm(self):
@@ -254,7 +258,6 @@ class ArdupilotConnection:
 		return lat, lon, alt
 
 	def get_status(self):
-
 		# Try receiving a few messages quickly
 		for _ in range(20):
 			msg = self.master.recv_match(
@@ -274,7 +277,9 @@ class ArdupilotConnection:
 			if msg.get_type() == "HEARTBEAT":
 				self.status["connected"] = True
 				self.status["armed"] = bool(self.master.motors_armed())
-				self.status["flying"] = msg.system_status == mavutil.mavlink.MAV_STATE_ACTIVE
+				self.status["flying"] = (
+					msg.system_status == mavutil.mavlink.MAV_STATE_ACTIVE
+				)
 
 			elif msg.get_type() == "GLOBAL_POSITION_INT":
 				self.status["position"] = {
@@ -350,9 +355,7 @@ class ArdupilotConnection:
 
 		return False
 
-	def monitor_mission_progress(
-		self, _update_status_hook=None, timeout=None
-	):
+	def monitor_mission_progress(self, _update_status_hook=None, timeout=None):
 		def func():
 			msg = self.master.recv_match(
 				type=["MISSION_CURRENT", "MISSION_COUNT"], blocking=False
@@ -369,6 +372,7 @@ class ArdupilotConnection:
 						_update_status_hook(msg.seq, True)
 					return True
 			return False
+
 		if timeout is not None:
 			start_time = time.time()
 			while time.time() - start_time < timeout:
@@ -409,19 +413,20 @@ if __name__ == "__main__":
 			[Waypoint(lat, lon, alt, hold=0) for lat, lon, alt in mission]
 		)
 
-		# THIS IS WRITTEN TO PROVE THAT 
+		# THIS IS WRITTEN TO PROVE THAT
 		# SANDWICHED BETWEEN MISSION WAYPOINTS,
 		# THE DRONE CAN BE REPOSITIONED
 		prev_seq = 0
+
 		def _update_status_hook(seq, completed):
 			# after waypoint is reached, set to GUIDED mode, move to base, and then set back to AUTO
-			global prev_seq 
+			global prev_seq
 			if not completed:
 				connection.log(f"Current waypoint: {seq} {prev_seq}")
 				if seq == prev_seq + 1:
 					connection.log(f"Reached waypoint {seq}, setting to GUIDED mode.")
 					connection._set_mode("GUIDED")
-					connection.goto_waypointv2(lat, lon, 10) 
+					connection.goto_waypointv2(lat, lon, 10)
 					while not connection.check_reposition_reached(lat, lon, 10):
 						time.sleep(1)
 					connection.log(f"Waypoint {seq} reached, setting to AUTO mode.")

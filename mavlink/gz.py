@@ -63,12 +63,13 @@ class GazeboConnection(ArdupilotConnection):
 		self.camera_port = camera_port
 		self.cap = GazeboVideoCapture(camera_port=camera_port)
 
+
 def enable_streaming(
-		model_name="iris_with_stationary_gimbal",
-		camera_link="tilt_link",
-		world="delivery_runway",
-		log=print
-		) -> bool:
+	model_name="iris_with_stationary_gimbal",
+	camera_link="tilt_link",
+	world="delivery_runway",
+	log=print,
+) -> bool:
 	"""
 	Enable streaming for the camera in the Gazebo simulation.
 	"""
@@ -98,10 +99,11 @@ def enable_streaming(
 		return True
 	except subprocess.CalledProcessError as e:
 		log("Error:", e.stderr)
-		log("The current topic is", ' '.join(command))
+		log("The current topic is", " ".join(command))
 		return False
 	except Exception as e:
 		log("Error:", e)
+
 
 def point_gimbal_downward(topic="/gimbal/cmd_tilt", angle=0) -> bool:
 	"""
@@ -126,9 +128,7 @@ def point_gimbal_downward(topic="/gimbal/cmd_tilt", angle=0) -> bool:
 			stderr=subprocess.PIPE,
 			text=True,
 		)
-		print(
-			"[CAMERA] Gimbal pointed to angle:", angle, "degrees. On topic:", topic
-		)
+		print("[CAMERA] Gimbal pointed to angle:", angle, "degrees. On topic:", topic)
 		return True
 	except subprocess.CalledProcessError as e:
 		print("Error:", e.stderr)

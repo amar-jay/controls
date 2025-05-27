@@ -28,6 +28,7 @@ mission = [
 	[lat, lon, alt + 3],  # Return to home
 ]
 
+
 def _imshow(guided_mode=False):
 	ret, frame = camera.read()
 	if not ret:
@@ -35,7 +36,15 @@ def _imshow(guided_mode=False):
 		return True
 	# write text guided mode
 	if guided_mode:
-		cv2.putText(frame, "Repositioning in progress...", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+		cv2.putText(
+			frame,
+			"Repositioning in progress...",
+			(10, 30),
+			cv2.FONT_HERSHEY_SIMPLEX,
+			1,
+			(0, 255, 0),
+			2,
+		)
 	cv2.imshow("Gazebo Video Stream", frame)
 
 	key = cv2.waitKey(30) & 0xFF
@@ -43,25 +52,29 @@ def _imshow(guided_mode=False):
 	# 	connection.log("User exited video stream.")
 	# 	return True
 
-# THIS IS WRITTEN TO PROVE THAT 
+
+# THIS IS WRITTEN TO PROVE THAT
 # SANDWICHED BETWEEN MISSION WAYPOINTS,
 # THE DRONE CAN BE REPOSITIONED
 prev_seq = 1
+
+
 def _update_status_hook(seq, completed):
 	# after waypoint is reached, set to GUIDED mode, move to base, and then set back to AUTO
-	global prev_seq 
+	global prev_seq
 	if not completed:
 		connection.log(f"Current waypoint: {seq} {prev_seq}")
 		if seq == prev_seq + 1:
 			connection.log(f"Reached waypoint {seq}, setting to GUIDED mode.")
 			connection._set_mode("GUIDED")
-			connection.goto_waypointv2(lat, lon, 10) 
+			connection.goto_waypointv2(lat, lon, 10)
 			while not connection.check_reposition_reached(lat, lon, 10):
 				_imshow(True)
 				time.sleep(0.1)
 			connection.log(f"Waypoint {seq} reached, setting to AUTO mode.")
 			connection._set_mode("AUTO")
 			prev_seq = seq
+
 
 try:
 	connection.upload_mission(
