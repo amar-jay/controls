@@ -51,9 +51,6 @@ class GazeboConnection(ArdupilotConnection):
 	def __init__(
 		self,
 		connection_string,
-		model_name="iris_with_gimbal",
-		camera_link="pitch_link",
-		world="our_runway",
 		camera_port=5600,
 		logger=None,
 	):
@@ -63,84 +60,79 @@ class GazeboConnection(ArdupilotConnection):
 			if logger
 			else print("[GazeboConnection]", *args),
 		)
-		self.model_name = model_name
-		self.camera_link = camera_link
-		self.world = world
-		self.cap = None
 		self.camera_port = camera_port
+		self.cap = GazeboVideoCapture(camera_port=camera_port)
 
-	def enable_streaming(self) -> bool:
-		"""
-		Enable streaming for the camera in the Gazebo simulation.
-		"""
-		world = self.world
-		model_name = self.model_name
-		camera_link = self.camera_link
+def enable_streaming(
+		model_name="iris_with_stationary_gimbal",
+		camera_link="tilt_link",
+		world="delivery_runway",
+		log=print
+		) -> bool:
+	"""
+	Enable streaming for the camera in the Gazebo simulation.
+	"""
+	command = [
+		"gz",
+		"topic",
+		"-t",
+		f"/world/{world}/model/{model_name}/model/gimbal/link/{camera_link}/sensor/camera/image/enable_streaming",
+		# "/world/our_runway/model/iris_with_gimbal/model/gimbal/link/pitch_link/sensor/camera/image/enable_streaming",
+		"-m",
+		"gz.msgs.Boolean",
+		"-p",
+		"data: 1",
+	]
 
-		command = [
-			"gz",
-			"topic",
-			"-t",
-			f"/world/{world}/model/{model_name}/model/gimbal/link/{camera_link}/sensor/camera/image/enable_streaming",
-			# "/world/our_runway/model/iris_with_gimbal/model/gimbal/link/pitch_link/sensor/camera/image/enable_streaming",
-			"-m",
-			"gz.msgs.Boolean",
-			"-p",
-			"data: 1",
-		]
+	try:
+		result = subprocess.run(
+			command,
+			check=True,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			text=True,
+		)
+		time.sleep(0.5)
+		log("🦾 Gazebo gimbal streaming enabled...", result.stdout)
 
-		try:
-			result = subprocess.run(
-				command,
-				check=True,
-				stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE,
-				text=True,
-			)
-			self.log("The current gimbal topic is", command[3])
-			time.sleep(0.5)
-			self.cap = GazeboVideoCapture(camera_port=self.camera_port)
+		return True
+	except subprocess.CalledProcessError as e:
+		log("Error:", e.stderr)
+		log("The current topic is", ' '.join(command))
+		return False
+	except Exception as e:
+		log("Error:", e)
 
-			self.log("🦾 Gazebo gimbal streaming enabled...", result.stdout)
+def point_gimbal_downward(topic="/gimbal/cmd_tilt", angle=0) -> bool:
+	"""
+	Uses gz command line to point gimbal downward.
+	"""
+	command = [
+		"gz",
+		"topic",
+		"-t",
+		f"{topic}",
+		"-m",
+		"gz.msgs.Double",
+		"-p",
+		f"data: {angle}",
+	]
 
-			return True
-		except subprocess.CalledProcessError as e:
-			self.log("Error:", e.stderr)
-			self.log("The current topic is", command[2])
-			return False
-		except Exception as e:
-			self.log("Error:", e)
-
-	def point_gimbal_downward(self, topic="/gimbal/cmd_tilt", angle=0) -> bool:
-		"""
-		Uses gz command line to point gimbal downward.
-		"""
-		command = [
-			"gz",
-			"topic",
-			"-t",
-			f"{topic}",
-			"-m",
-			"gz.msgs.Double",
-			"-p",
-			f"data: {angle}",
-		]
-
-		try:
-			subprocess.run(
-				command,
-				check=True,
-				stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE,
-				text=True,
-			)
-			print(
-				"[CAMERA] Gimbal pointed to angle:", angle, "degrees. On topic:", topic
-			)
-			return True
-		except subprocess.CalledProcessError as e:
-			print("Error:", e.stderr)
-			return False
+	try:
+		subprocess.run(
+			command,
+			check=True,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			text=True,
+		)
+		print(
+			"[CAMERA] Gimbal pointed to angle:", angle, "degrees. On topic:", topic
+		)
+		return True
+	except subprocess.CalledProcessError as e:
+		print("Error:", e.stderr)
+		return False
 
 
 def goto_waypoint_basic(master, lat: float, lon: float, alt: float):
@@ -238,29 +230,31 @@ def goto_waypoint_sync(
 if __name__ == "__main__":
 	# Example usage
 	# Example usage
-	connection = GazeboConnection(
+	from .ardupilot import ArdupilotConnection
+	import pymavlink.dialects.v20.all as dialect
+
+	enable_streaming()
+	connection = ArdupilotConnection(
 		connection_string="udp:127.0.0.1:14550",
-		world="delivery_runway",
-		camera_link="tilt_link",
-		model_name="iris_with_stationary_gimbal",
+		logger=lambda *args: print("[GazeboConnection]", *args),
 	)
 
 	connection.arm()
-	connection.takeoff(10)
-	if not connection.enable_streaming():
-		exit(1)
+	point_gimbal_downward()
 
-	connection.point_gimbal_downward()
+	connection.takeoff(10)
+
+	cap = GazeboVideoCapture()
 	connection._set_mode("AUTO")
 
 	_lat, _lon, _ = connection.get_current_gps_location()
 
 	connection.goto_waypoint(_lat + 0.00001, _lon + 0.00001, 3)
 
-	camera = connection.cap.get_capture()
+	camera = cap.get_capture()
 
 	while True:
-		if connection.check_reposition_reached():
+		if connection.check_reposition_reached(_lat + 0.00001, _lon + 0.00001, 3):
 			connection.log("Waypoint reached!")
 			break
 		ret, frame = camera.read()
@@ -268,13 +262,12 @@ if __name__ == "__main__":
 			connection.log("Failed to capture frame.")
 			break
 		cv2.imshow("Gazebo Video Stream", frame)
-		# Process window events and check for exit key (q)
-		key = cv2.waitKey(30) & 0xFF  # 30ms delay between frames
+		key = cv2.waitKey(30) & 0xFF
 		if key == ord("q"):
 			connection.log("User exited video stream.")
 			break
 	connection.return_to_launch()
 	connection.clear_mission()
-	connection.master.close()
+	connection.close()
 	connection.log("Connection closed.")
 	connection.log("Ardupilot connection example completed.")
