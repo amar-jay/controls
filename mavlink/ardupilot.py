@@ -84,9 +84,6 @@ class ArdupilotConnection:
 			0,  # Arm (1 to arm, 0 to disarm)
 		)
 
-		# Wait for arming
-		self.log("Vehicle armed!")
-
 	def safety_switch(self, state):
 		self.master.mav.set_mode_send(
 			self.master.target_system,
@@ -186,9 +183,6 @@ class ArdupilotConnection:
 		)
 		self.ack_sync("MISSION_REQUEST")
 		for i, waypoint in enumerate(waypoints):
-			print(
-				f"Uploading waypoint {i}: lat={waypoint.lat}, lon={waypoint.lon}, alt={waypoint.alt}, hold={waypoint.hold}"
-			)
 			# send mission item
 			self.master.mav.mission_item_send(
 				target_system=self.master.target_system,  # System ID
@@ -210,7 +204,7 @@ class ArdupilotConnection:
 			)
 			if i != num_wp - 1:
 				self.ack_sync("MISSION_REQUEST")
-				self.log(f"Waypoint {i} uploaded: {waypoint}")
+				self.log(f"Waypoint {i} uploaded: {waypoint.__dict__}")
 
 		self.ack_sync("MISSION_ACK")
 		self.log("Mission upload complete.")
@@ -249,7 +243,7 @@ class ArdupilotConnection:
 		)
 		if not msg:
 			self.log("❌ Timeout: Failed to receive GPS data.")
-			return None
+			return
 
 		lat = msg.lat / 1e7  # Convert from 1e7-scaled degrees to float degrees
 		lon = msg.lon / 1e7
@@ -285,7 +279,7 @@ class ArdupilotConnection:
 				self.status["position"] = {
 					"lat": msg.lat / 1e7,
 					"lon": msg.lon / 1e7,
-					"alt": msg.alt / 1e3,
+					"alt": msg.relative_alt / 1e3,
 				}
 			elif msg.get_type() == "ATTITUDE":
 				self.status["orientation"] = {
@@ -349,6 +343,7 @@ class ArdupilotConnection:
 
 	def check_reposition_reached(self, _lat, _lon, _alt):
 		lat, lon, alt = self.get_current_gps_location()
+		# print(f"difference: {abs(_lat-lat)} , {abs(_lon-lon)}, {_alt}/{alt}")
 		if abs(_lat - lat) < 5e-6 and abs(_lon - lon) < 5e-6 and abs(_alt - alt) < 1e-2:
 			self.log("✅ Reposition reached!")
 			return True

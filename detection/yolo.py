@@ -22,20 +22,6 @@ class YoloObjectTracker:
 		# results = self.model.predict(frame, conf=0.5)  # Uncomment if using older YOLOv8
 		return results[0]  # single frame
 
-	def get_target_detection(self, detections, target_class):
-		for box in detections.boxes:
-			cls = int(box.cls[0])
-			label = self.model.names[cls]
-			if label == target_class:
-				return box
-		return None
-
-	def get_object_center(self, box):
-		x1, y1, x2, y2 = box.xyxy[0]
-		cx = (x1 + x2) / 2
-		cy = (y1 + y2) / 2
-		return float(cx), float(cy)
-
 	def get_pixel_offset(self, cx, cy):
 		dx = cx - self.frame_width / 2
 		dy = cy - self.frame_height / 2
@@ -66,9 +52,30 @@ class YoloObjectTracker:
 		new_lon = current_lon + (dlon * 180 / np.pi)
 
 		return new_lat, new_lon
+	
+	def plot(self, frame, detections, object_class, threshold, color=(100, 255, 0)):
+		if not hasattr(detections, "boxes"):
+			return frame, None
+
+		boxes = detections.boxes[detections.boxes.conf >= threshold]
+		for box in boxes:
+			if self.model.names[int(box.cls[0])] == object_class:
+				conf = box.conf.cpu().numpy()[0]
+				x1, y1, x2, y2 = map(int, box.xyxy[0])
+				center = ((x1 + x2) // 2, (y1 + y2) // 2)
+
+				cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+				cv2.circle(frame, center, 4, (0, 0, 255), -1)
+				cv2.putText(frame, f"{object_class}: {conf:.2f}", (x1, y1 - 10),
+				            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+				return frame, center
+				
+		return frame, None
+
 
 	def process_frame(
 		self,
+		frame,
 		detections,
 		current_lat,
 		current_lon,
@@ -76,19 +83,20 @@ class YoloObjectTracker:
 		object_class="helipad",
 		threshold=0.5,
 	):
-		detections.boxes = detections.boxes[detections.boxes.conf > threshold]
-		annotated_frame = detections.plot()
-		target_box = self.get_target_detection(detections, object_class)
-		if target_box is None:
-			return None, None, annotated_frame
-
-		cx, cy = self.get_object_center(target_box)
-		dx, dy = self.get_pixel_offset(cx, cy)
-		angle_dx, angle_dy = self.pixel_to_angle(dx, dy)
+		annotated_frame, best_center = self.plot(
+			frame, detections, object_class, threshold
+		)
+		if best_center is None:
+			return annotated_frame, None, None
+		offset = self.get_pixel_offset(*best_center)
+		angle_dx, angle_dy = self.pixel_to_angle(*offset)
 		offset_x, offset_y = self.estimate_gps_offset(angle_dx, angle_dy, altitude)
 		target_gps = self.meters_to_gps(current_lat, current_lon, offset_x, offset_y)
+		return annotated_frame, target_gps, best_center
 
-		return target_gps, (cx, cy), annotated_frame
+
+
+
 
 
 if __name__ == "__main__":
@@ -128,10 +136,7 @@ if __name__ == "__main__":
 		# Run inference
 		results = estimator.detect(frame)
 		try:
-			w = estimator.process_frame(results, 0, 0, 10)
-			coords, center_pose, annotated_frame = (
-				w  # TODO: add these parameters to frame -> return (target_lat, target_lon), (cx, cy), annotated_frame
-			)
+			coords, center_pose, annotated_frame = estimator.process_frame(frame, results, 0, 0, 10)
 			if coords is None or center_pose is None:
 				cv2.putText(
 					annotated_frame,
