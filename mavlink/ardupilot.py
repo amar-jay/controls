@@ -1,5 +1,5 @@
-from math import degrees
 import time
+import math
 from pymavlink import mavutil
 import pymavlink.dialects.v20.all as dialect
 from .mission_types import Waypoint, deprecated_method
@@ -251,6 +251,46 @@ class ArdupilotConnection:
 
 		return lat, lon, alt
 
+	def get_current_attitude(self, timeout=1.0):
+		"""
+		Get the current attitude (roll, pitch, yaw) of the drone in radians.
+
+		Returns:
+		    tuple: (roll, pitch, yaw) in radians
+		    None: If attitude data is not available
+		"""
+		try:
+			# Request attitude data
+			# self.master.mav.request_data_stream_send(
+			# 	self.master.target_system,
+			# 	self.master.target_component,
+			# 	mavutil.mavlink.MAV_DATA_STREAM_EXTRA1,  # Attitude data
+			# 	10,  # 10 Hz rate
+			# 	1,  # Start sending
+			# )
+
+			# Wait for the attitude message
+			msg = self.master.recv_match(
+				type="ATTITUDE", blocking=True, timeout=timeout
+			)
+
+			if msg:
+				roll = msg.roll  # Roll angle in radians
+				pitch = msg.pitch  # Pitch angle in radians
+				yaw = msg.yaw  # Yaw angle in radians
+
+				# Normalize yaw to [0, 2π] range if needed
+				if yaw < 0:
+					yaw += 2 * math.pi
+				return (roll, pitch, yaw)
+			else:
+				self.log("❌ Failed to get attitude data")
+				return None
+
+		except Exception as e:
+			self.log(f"❌ Error getting attitude: {e}")
+			return None
+
 	def get_status(self):
 		# Try receiving a few messages quickly
 		for _ in range(20):
@@ -283,9 +323,9 @@ class ArdupilotConnection:
 				}
 			elif msg.get_type() == "ATTITUDE":
 				self.status["orientation"] = {
-					"roll": degrees(msg.roll),
-					"pitch": degrees(msg.pitch),
-					"yaw": degrees(msg.yaw),
+					"roll": math.degrees(msg.roll),
+					"pitch": math.degrees(msg.pitch),
+					"yaw": math.degrees(msg.yaw),
 				}
 			elif msg.get_type() == "MISSION_CURRENT":
 				self.status["current_waypoint"] = msg.seq
