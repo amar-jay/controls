@@ -4,7 +4,7 @@ import time
 import pymavlink.dialects.v20.all as dialect
 from pymavlink import mavutil
 
-from .mission_types import Waypoint, deprecated_method
+from src.controls.mavlink.mission_types import Waypoint
 
 # ========== ========= ========= =========
 # ========== Global Variables ==========

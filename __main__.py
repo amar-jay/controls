@@ -5,10 +5,13 @@ import time
 import cv2
 import numpy as np
 
-from .detection import yolo
-from .gps.ekf import GeoFilter
-from .mavlink.ardupilot import ArdupilotConnection, Waypoint
-from .mavlink.gz import GazeboVideoCapture, enable_streaming, point_gimbal_downward
+from src.controls.detection import yolo
+from src.controls.gps.ekf import GeoFilter
+from src.controls.mavlink.ardupilot import ArdupilotConnection, Waypoint
+from src.controls.mavlink.gz import (  # , point_gimbal_downward
+    GazeboVideoCapture,
+    enable_streaming,
+)
 
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
 

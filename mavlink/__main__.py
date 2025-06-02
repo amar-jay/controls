@@ -2,8 +2,12 @@ import time
 
 import cv2
 
-from .ardupilot import ArdupilotConnection, Waypoint
-from .gz import GazeboVideoCapture, enable_streaming, point_gimbal_downward
+from src.controls.mavlink.ardupilot import ArdupilotConnection, Waypoint
+from src.controls.mavlink.gz import (
+    GazeboVideoCapture,
+    enable_streaming,
+    point_gimbal_downward,
+)
 
 ## THIS FILE IS MAINLY FOR TESTING PURPOSES
 connection = ArdupilotConnection("udp:127.0.0.1:14550")
